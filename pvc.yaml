@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: v1
+  kind: Endpoints
+  metadata:
+    name: heketi-storage-endpoints
+  subsets:
+  - addresses:
+    - ip: 192.168.0.110
+    - ip: 192.168.0.171
+    - ip: 192.168.0.5
+    ports:
+    - port: 1
+      protocol: TCP
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    name: prometheus-data
+  spec:
+    accessModes:
+    - ReadWriteMany
+    capacity:
+      storage: 10Gi
+    glusterfs:
+      endpoints: heketi-storage-endpoints
+      path: prometheuus-data
+    persistentVolumeReclaimPolicy: Recycle
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    name: prometheus-alertmanager
+  spec:
+    accessModes:
+    - ReadWriteMany
+    capacity:
+      storage: 1Gi
+    glusterfs:
+      endpoints: heketi-storage-endpoints
+      path: prometheuus-alertmanager
+    persistentVolumeReclaimPolicy: Recycle
+- apiVersion: v1
+  kind: PersistentVolume
+  metadata:
+    name: prometheus-grafana
+  spec:
+    accessModes:
+    - ReadWriteMany
+    capacity:
+      storage: 1Gi
+    glusterfs:
+      endpoints: heketi-storage-endpoints
+      path: prometheuus-grafana
+    persistentVolumeReclaimPolicy: Recycle
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: prometheus-data
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 100G
+    volumeName: prometheus-data
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: prometheus-alertmanager
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 1G
+    volumeName: prometheus-alertmanager
+- apiVersion: v1
+  kind: PersistentVolumeClaim
+  metadata:
+    name: prometheus-grafana
+  spec:
+    accessModes:
+    - ReadWriteMany
+    resources:
+      requests:
+        storage: 1G
+    volumeName: prometheus-grafana
