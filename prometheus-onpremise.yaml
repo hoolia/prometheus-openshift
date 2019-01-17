@@ -1,0 +1,231 @@
+apiVersion: v1
+kind: Template
+metadata:
+  creationTimestamp: null
+  name: prometheus-onpremise
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: null
+    name: kube-state-metrics
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: null
+    name: prometheus-node-exporter
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    creationTimestamp: null
+    name: prometheus-k8s
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      prometheus.io/scrape: "true"
+    creationTimestamp: null
+    labels:
+      app: kube-state-metrics
+    name: kube-state-metrics
+  spec:
+    ports:
+    - name: https
+      port: 8443
+      protocol: TCP
+      targetPort: 8443
+    selector:
+      app: kube-state-metrics
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    creationTimestamp: null
+    generation: 2
+    labels:
+      app: prometheus-node-exporter
+      role: monitoring
+    name: prometheus-node-exporter
+  spec:
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: prometheus-node-exporter
+        role: monitoring
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: prometheus-node-exporter
+          role: monitoring
+        name: prometheus-exporter
+      spec:
+        containers:
+        - args:
+          - --path.procfs
+          - /host/proc
+          - --path.sysfs
+          - /host/sys
+          - --collector.filesystem.ignored-mount-points
+          - '"^/(sys|proc|dev|host|etc)($|/)"'
+          - --collector.textfile.directory
+          - /textfile_collector
+          image: registry.access.redhat.com/openshift3/prometheus-node-exporter:v3.9
+          imagePullPolicy: Always
+          name: node-exporter
+          ports:
+          - containerPort: 9100
+            hostPort: 9100
+            name: scrape
+            protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 30Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /host/dev
+            name: dev
+          - mountPath: /host/proc
+            name: proc
+          - mountPath: /host/sys
+            name: sys
+          - mountPath: /rootfs
+            name: rootfs
+          - mountPath: /textfile_collector
+            name: textfile-collector
+        dnsPolicy: ClusterFirst
+        hostNetwork: true
+        hostPID: true
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: prometheus-node-exporter
+        serviceAccountName: prometheus-node-exporter
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - hostPath:
+            path: /proc
+          name: proc
+        - hostPath:
+            path: /dev
+          name: dev
+        - hostPath:
+            path: /sys
+          name: sys
+        - hostPath:
+            path: /
+          name: rootfs
+        - hostPath:
+            path: /var/lib/node_exporter/textfile_collector
+          name: textfile-collector
+    templateGeneration: 2
+    updateStrategy:
+      rollingUpdate:
+        maxUnavailable: 1
+      type: RollingUpdate
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    annotations:
+    labels:
+      app: kube-state-metrics
+    name: kube-state-metrics
+    namespace: openshift-monitoring
+  spec:
+    progressDeadlineSeconds: 600
+    replicas: 1
+    revisionHistoryLimit: 10
+    selector:
+      matchLabels:
+        app: kube-state-metrics
+    strategy:
+      rollingUpdate:
+        maxSurge: 25%
+        maxUnavailable: 25%
+      type: RollingUpdate
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          app: kube-state-metrics
+      spec:
+        containers:
+        - args:
+          - --secure-listen-address=:8443
+          - --upstream=http://127.0.0.1:8081/
+          - --tls-cert-file=/etc/tls/private/tls.crt
+          - --tls-private-key-file=/etc/tls/private/tls.key
+          image: registry.access.redhat.com/openshift3/ose-kube-rbac-proxy:latest
+          imagePullPolicy: IfNotPresent
+          name: kube-rbac-proxy-main
+          ports:
+          - containerPort: 8443
+            name: https-main
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 20m
+              memory: 40Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: kube-state-metrics-tls
+        - args:
+          - --secure-listen-address=:9443
+          - --upstream=http://127.0.0.1:8082/
+          - --tls-cert-file=/etc/tls/private/tls.crt
+          - --tls-private-key-file=/etc/tls/private/tls.key
+          image: registry.access.redhat.com/openshift3/ose-kube-rbac-proxy:latest
+          imagePullPolicy: IfNotPresent
+          name: kube-rbac-proxy-self
+          ports:
+          - containerPort: 9443
+            name: https-self
+            protocol: TCP
+          resources:
+            limits:
+              cpu: 20m
+              memory: 40Mi
+            requests:
+              cpu: 10m
+              memory: 20Mi
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: kube-state-metrics-tls
+        - args:
+          - --port=8081
+          - --telemetry-port=8082
+          image: registry.access.redhat.com/openshift3/ose-kube-state-metrics:latest
+          imagePullPolicy: IfNotPresent
+          name: kube-state-metrics
+          resources: {}
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+          volumeMounts:
+          - mountPath: /tmp
+            name: volume-directive-shadow
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        schedulerName: default-scheduler
+        securityContext: {}
+        serviceAccount: kube-state-metrics
+        serviceAccountName: kube-state-metrics
+        terminationGracePeriodSeconds: 30
+        volumes:
+        - emptyDir: {}
+          name: volume-directive-shadow
+        - name: kube-state-metrics-tls
+          secret:
+            defaultMode: 420
+            secretName: kube-state-metrics-tls
