@@ -156,54 +156,6 @@ objects:
       spec:
         containers:
         - args:
-          - --secure-listen-address=:8443
-          - --upstream=http://127.0.0.1:8081/
-          - --tls-cert-file=/etc/tls/private/tls.crt
-          - --tls-private-key-file=/etc/tls/private/tls.key
-          image: registry.access.redhat.com/openshift3/ose-kube-rbac-proxy:latest
-          imagePullPolicy: IfNotPresent
-          name: kube-rbac-proxy-main
-          ports:
-          - containerPort: 8443
-            name: https-main
-            protocol: TCP
-          resources:
-            limits:
-              cpu: 20m
-              memory: 40Mi
-            requests:
-              cpu: 10m
-              memory: 20Mi
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          volumeMounts:
-          - mountPath: /etc/tls/private
-            name: kube-state-metrics-tls
-        - args:
-          - --secure-listen-address=:9443
-          - --upstream=http://127.0.0.1:8082/
-          - --tls-cert-file=/etc/tls/private/tls.crt
-          - --tls-private-key-file=/etc/tls/private/tls.key
-          image: registry.access.redhat.com/openshift3/ose-kube-rbac-proxy:latest
-          imagePullPolicy: IfNotPresent
-          name: kube-rbac-proxy-self
-          ports:
-          - containerPort: 9443
-            name: https-self
-            protocol: TCP
-          resources:
-            limits:
-              cpu: 20m
-              memory: 40Mi
-            requests:
-              cpu: 10m
-              memory: 20Mi
-          terminationMessagePath: /dev/termination-log
-          terminationMessagePolicy: File
-          volumeMounts:
-          - mountPath: /etc/tls/private
-            name: kube-state-metrics-tls
-        - args:
           - --port=8081
           - --telemetry-port=8082
           image: registry.access.redhat.com/openshift3/ose-kube-state-metrics:latest
@@ -225,7 +177,3 @@ objects:
         volumes:
         - emptyDir: {}
           name: volume-directive-shadow
-        - name: kube-state-metrics-tls
-          secret:
-            defaultMode: 420
-            secretName: kube-state-metrics-tls
