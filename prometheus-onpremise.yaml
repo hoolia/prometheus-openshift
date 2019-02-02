@@ -31,9 +31,9 @@ objects:
   spec:
     ports:
     - name: https
-      port: 8443
+      port: 8081
       protocol: TCP
-      targetPort: 8443
+      targetPort: 8081
     selector:
       app: kube-state-metrics
     sessionAffinity: None
